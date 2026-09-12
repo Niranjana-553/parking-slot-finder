@@ -22,6 +22,18 @@ public class ParkingSlotController {
     public List<ParkingSlot> getAllParkingSlots() {
         return parkingSlotRepository.findAll();
     }
+    // Get all available parking slots
+    @GetMapping("/available")
+    public List<ParkingSlot> getAvailableParkingSlots() {
+    return parkingSlotRepository.findByOccupiedFalse();
+}
+// Get available parking slots for a specific parking lot
+@GetMapping("/available/lot/{parkingLotId}")
+public List<ParkingSlot> getAvailableSlotsByParkingLot(
+        @PathVariable Long parkingLotId) {
+
+    return parkingSlotRepository.findByParkingLotIdAndOccupiedFalse(parkingLotId);
+}
 
     // Get one parking slot by ID
     @GetMapping("/{id}")
