@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="20dp" android:background="#F5F7FA"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="24sp" android:textStyle="bold" android:textColor="#071A32"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Available slots" android:textSize="16sp" android:paddingBottom="12dp"/>
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:id="@+id/slotList" android:orientation="vertical"
+            android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    </ScrollView>
+</LinearLayout>
