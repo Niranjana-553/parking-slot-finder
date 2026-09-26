@@ -20,11 +20,16 @@ public class ParkingLot {
 
     private Double longitude;
 
+    private String district;
+
     @Column(name = "total_slots")
     private Integer totalSlots;
 
     @Column(name = "available_slots")
     private Integer availableSlots;
+
+    @Column(name = "price", precision = 10, scale = 2)
+    private java.math.BigDecimal price;
 
     public ParkingLot() {
     }
@@ -51,6 +56,14 @@ public class ParkingLot {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getDistrict() {
+        return district;
+    }
+
+    public void setDistrict(String district) {
+        this.district = district;
     }
 
     public Double getLatitude() {
@@ -84,4 +97,13 @@ public class ParkingLot {
     public void setAvailableSlots(Integer availableSlots) {
         this.availableSlots = availableSlots;
     }
+
+    public java.math.BigDecimal getPrice() {
+    return price;
+    }
+    public void setPrice(java.math.BigDecimal price) {
+    this.price = price;
+    }
+
+    
 }

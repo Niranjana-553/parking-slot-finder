@@ -71,7 +71,10 @@ public class BookingActivity extends AppCompatActivity {
             finish();
             return;
         }
-        double price = getParkingPrice(parkingLotName);
+        double price = getIntent().getDoubleExtra(
+                "price",
+                0.0
+        );
         if (slotNumber != null && !slotNumber.isEmpty()) {
 
             slotText.setText(
@@ -134,38 +137,7 @@ public class BookingActivity extends AppCompatActivity {
         });
     }
 
-    private double getParkingPrice(String parkingLotName) {
 
-        if (parkingLotName == null) {
-            return 0.0;
-        }
-
-        String name = parkingLotName
-                .trim()
-                .toLowerCase(Locale.US);
-
-        // Supreme = ₹120
-        if (name.contains("supreme")) {
-            return 120.0;
-        }
-
-        // Chinnakada = ₹90
-        if (name.contains("chinnakada")) {
-            return 90.0;
-        }
-
-        // Ashramam = ₹50
-        if (name.contains("ashramam")) {
-            return 50.0;
-        }
-
-        // Kollam = ₹70
-        if (name.contains("kollam")) {
-            return 70.0;
-        }
-
-        return 0.0;
-    }
     private void createBooking(
             int slotId,
             int parkingLotId,

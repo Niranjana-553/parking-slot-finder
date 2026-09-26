@@ -125,8 +125,9 @@ public class SlotActivity extends AppCompatActivity {
 
                             String slotNumber =
                                     slot.slotNumber != null
+                                            && !slot.slotNumber.trim().isEmpty()
                                             ? slot.slotNumber
-                                            : String.valueOf(slot.id);
+                                            : "Not specified";
 
                             String status =
                                     slot.status != null

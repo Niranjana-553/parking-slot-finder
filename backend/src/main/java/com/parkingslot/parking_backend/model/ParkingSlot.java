@@ -20,6 +20,8 @@ public class ParkingSlot {
     @Column(name = "slot_type")
     private String slotType;
 
+    
+
     @Column(name = "status", nullable = false)
     private String status;
 
@@ -51,6 +53,8 @@ public class ParkingSlot {
         return slotType;
     }
 
+    
+
     public String getStatus() {
         return status;
     }
@@ -80,6 +84,7 @@ public class ParkingSlot {
     public void setSlotType(String slotType) {
         this.slotType = slotType;
     }
+
 
     public void setStatus(String status) {
         this.status = status;

@@ -9,16 +9,11 @@ public class ParkingLot {
     public String name;
 
     public String address;
+    public String district;
+    public Double latitude;
+    public Double longitude;
 
-    /*
-     * Accept BOTH possible backend names:
-     *
-     * availableSlots
-     * available_slots
-     *
-     * This prevents the value from becoming null/0
-     * because of a JSON naming mismatch.
-     */
+
     @SerializedName(
             value = "availableSlots",
             alternate = {"available_slots"}

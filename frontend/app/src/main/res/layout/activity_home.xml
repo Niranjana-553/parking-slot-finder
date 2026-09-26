@@ -18,32 +18,24 @@
         <!-- Logo row -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="55dp"
+            android:layout_height="90dp"
             android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/filterButton"
+            <View
                 android:layout_width="45dp"
-                android:layout_height="45dp"
-                android:gravity="center"
-                android:text="☷"
-                android:textColor="#FFFFFF"
-                android:textSize="30sp"
-                android:clickable="true"
-                android:focusable="true"/>
+                android:layout_height="50dp"/>
 
             <ImageView
                 android:layout_width="0dp"
-                android:layout_height="45dp"
+                android:layout_height="80dp"
                 android:layout_weight="1"
-                android:layout_marginTop="10dp"
+                android:translationY="10dp"
                 android:src="@drawable/parknow_logo"
-                android:scaleType="centerInside"
+                android:scaleType="fitCenter"
                 android:contentDescription="ParkNow logo"/>
 
             <View
                 android:layout_width="45dp"
-                android:layout_height="45dp"/>
+                android:layout_height="50dp"/>
 
         </LinearLayout>
 
@@ -63,31 +55,31 @@
         android:paddingStart="14dp"
         android:paddingEnd="12dp">
 
-        <TextView
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="☰"
-            android:textColor="#45404A"
-            android:textSize="20sp"/>
 
-        <TextView
+
+        <EditText
             android:id="@+id/searchText"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center_vertical"
-            android:text="Search location"
+            android:hint="Search location"
             android:textColor="#45404A"
-            android:textSize="16sp"/>
+            android:textColorHint="#45404A"
+            android:textSize="16sp"
+            android:background="@null"
+            android:singleLine="true"/>
 
         <TextView
+            android:id="@+id/searchButton"
             android:layout_width="40dp"
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="⌕"
             android:textColor="#45404A"
-            android:textSize="28sp"/>
+            android:textSize="28sp"
+            android:clickable="true"
+            android:focusable="true"/>
 
     </LinearLayout>
 
@@ -122,7 +114,6 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Current Location"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp"/>
 
@@ -132,7 +123,8 @@
                 android:layout_height="wrap_content"
                 android:text="Kollam, Kerala"
                 android:textColor="#FFFFFF"
-                android:textSize="13sp"/>
+                android:textSize="15sp"
+                android:translationY="-7dp"/>
 
         </LinearLayout>
 
@@ -143,7 +135,7 @@
             android:gravity="center"
             android:text="change  ▾"
             android:textColor="#1683FF"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:clickable="true"
             android:focusable="true"/>
 

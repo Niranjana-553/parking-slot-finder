@@ -15,6 +15,12 @@ public interface ParkingApi {
     @GET("api/parking-lots")
     Call<List<ParkingLot>> getParkingLots();
 
+    @GET("api/location/district")
+    Call<DistrictResponse> getDistrict(
+            @Query("latitude") double latitude,
+            @Query("longitude") double longitude
+    );
+
     @GET("api/parking-lots/{id}")
     Call<ParkingLot> getParkingLot(@Path("id") String id);
 

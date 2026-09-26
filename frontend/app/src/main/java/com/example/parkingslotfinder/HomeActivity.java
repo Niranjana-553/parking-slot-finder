@@ -1,18 +1,31 @@
 package com.example.parkingslotfinder;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.text.Editable;
+import android.text.TextWatcher;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.List;
+import java.util.Comparator;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -21,16 +34,36 @@ import retrofit2.Response;
 public class HomeActivity extends AppCompatActivity {
 
     private LinearLayout list;
+    private FusedLocationProviderClient fusedLocationClient;
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
+    private double userLatitude;
+    private double userLongitude;
+    private String userDistrict;
+    private String selectedDistrict;
+    private TextView locationText;
+    private boolean sortByAvailableSlots = false;
+    private String searchQuery = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_home);
+        locationText = findViewById(R.id.locationText);
+        fusedLocationClient =
+                LocationServices.getFusedLocationProviderClient(this);
 
         list = findViewById(R.id.parkingList);
+        getUserLocation();
 
+        EditText searchText = findViewById(R.id.searchText);
+        TextView searchButton = findViewById(R.id.searchButton);
 
+        searchButton.setOnClickListener(v -> {
+            searchQuery = searchText.getText().toString().trim();
+            loadParkingLots();
+        });
 
         findViewById(R.id.notificationButton).setOnClickListener(v ->
                 startActivity(
@@ -41,8 +74,6 @@ public class HomeActivity extends AppCompatActivity {
                 )
         );
 
-
-
         findViewById(R.id.profileButton).setOnClickListener(v ->
                 startActivity(
                         new Intent(
@@ -51,8 +82,6 @@ public class HomeActivity extends AppCompatActivity {
                         )
                 )
         );
-
-
 
         findViewById(R.id.parkingButton).setOnClickListener(v ->
                 startActivity(
@@ -63,41 +92,219 @@ public class HomeActivity extends AppCompatActivity {
                 )
         );
 
+        findViewById(R.id.changeLocation).setOnClickListener(v -> {
+
+            String[] districts = {
+                    "Thiruvananthapuram",
+                    "Kollam",
+                    "Pathanamthitta",
+                    "Alappuzha",
+                    "Kottayam",
+                    "Idukki",
+                    "Ernakulam",
+                    "Thrissur",
+                    "Palakkad",
+                    "Malappuram",
+                    "Kozhikode",
+                    "Wayanad",
+                    "Kannur",
+                    "Kasaragod"
+            };
+
+            new AlertDialog.Builder(HomeActivity.this)
+                    .setTitle("Select District")
+                    .setItems(districts, (dialog, which) -> {
+
+                        selectedDistrict = districts[which];
+
+                        locationText.setText(
+                                "Selected Location\n" + selectedDistrict + ", Kerala"
+                        );
+
+                        loadParkingLots();
+                    })
+
+                    .show();
+
+            
+
+            searchText.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    searchQuery = s.toString().trim();
+                    loadParkingLots();
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {}
+            });
+
+        });
+
+        findViewById(R.id.sortButton).setOnClickListener(v -> {
+            sortByAvailableSlots = !sortByAvailableSlots;
+
+            TextView sortButton = findViewById(R.id.sortButton);
+
+            if (sortByAvailableSlots) {
+                sortButton.setText("sort by : available slots ▾");
+            } else {
+                sortButton.setText("sort by : distance ▾");
+            }
+
+            loadParkingLots();
+        });
 
 
-        findViewById(R.id.changeLocation).setOnClickListener(v ->
+    }
+
+    private void getUserLocation() {
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                    },
+                    LOCATION_PERMISSION_REQUEST_CODE
+            );
+
+            return;
+        }
+
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, location -> {
+
+                    if (location != null) {
+
+                        userLatitude = location.getLatitude();
+                        userLongitude = location.getLongitude();
+                        findUserDistrict();
+
+
+                    } else {
+
+                        Ui.toast(
+                                HomeActivity.this,
+                                "Please enable location and try again."
+                        );
+                    }
+                });
+    }
+
+    private void findUserDistrict() {
+
+        ParkingApi api =
+                ApiClient.spring().create(ParkingApi.class);
+
+        api.getDistrict(
+                userLatitude,
+                userLongitude
+        ).enqueue(new retrofit2.Callback<DistrictResponse>() {
+
+            @Override
+            public void onResponse(
+                    retrofit2.Call<DistrictResponse> call,
+                    retrofit2.Response<DistrictResponse> response
+            ) {
+
+                if (response.isSuccessful()
+                        && response.body() != null
+                        && response.body().district != null) {
+
+                    userDistrict =
+                            response.body().district;
+
+                    selectedDistrict =
+                            userDistrict;
+
+                    locationText.setText(
+                            "Current Location\n" + selectedDistrict + ", Kerala"
+                    );
+
+                    loadParkingLots();
+
+                } else {
+
+                    Ui.toast(
+                            HomeActivity.this,
+                            "Could not determine your district."
+                    );
+                }
+            }
+
+            @Override
+            public void onFailure(
+                    retrofit2.Call<DistrictResponse> call,
+                    Throwable t
+            ) {
+
                 Ui.toast(
                         HomeActivity.this,
-                        "Location selection coming soon"
-                )
+                        "District error : " + t.getMessage()
+                );
+            }
+        });
+    }
+
+    private float calculateDistance(ParkingLot lot) {
+
+        if (lot.latitude == null || lot.longitude == null) {
+            return Float.MAX_VALUE;
+        }
+
+        float[] distance = new float[1];
+
+        Location.distanceBetween(
+                userLatitude,
+                userLongitude,
+                lot.latitude,
+                lot.longitude,
+                distance
         );
 
+        return distance[0];
+    }
 
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
 
-        findViewById(R.id.searchText).setOnClickListener(v ->
+        super.onRequestPermissionsResult(
+                requestCode,
+                permissions,
+                grantResults
+        );
+
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                getUserLocation();
+
+            } else {
+
                 Ui.toast(
                         HomeActivity.this,
-                        "Search coming soon"
-                )
-        );
-
-
-
-        findViewById(R.id.filterButton).setOnClickListener(v ->
-                Ui.toast(
-                        HomeActivity.this,
-                        "Filters coming soon"
-                )
-        );
-
-        findViewById(R.id.sortButton).setOnClickListener(v ->
-                Ui.toast(
-                        HomeActivity.this,
-                        "Parking is sorted by distance"
-                )
-        );
-
-        loadParkingLots();
+                        "Location permission is required to find nearby parking."
+                );
+            }
+        }
     }
 
 
@@ -146,35 +353,61 @@ public class HomeActivity extends AppCompatActivity {
                             return;
                         }
 
-                        List<ParkingLot> lots =
-                                response.body();
+                        List<ParkingLot> lots = response.body();
 
-                        if (lots.isEmpty()) {
+                        if (lots == null || lots.isEmpty()) {
 
-                            TextView empty =
-                                    new TextView(
-                                            HomeActivity.this
-                                    );
-
-                            empty.setText(
-                                    "No parking lots available."
+                            Ui.toast(
+                                    HomeActivity.this,
+                                    "No parking lots found."
                             );
-
-                            empty.setTextColor(
-                                    0xFFFFFFFF
-                            );
-
-                            empty.setTextSize(
-                                    16
-                            );
-
-                            list.addView(empty);
 
                             return;
                         }
 
-                        for (ParkingLot lot : lots) {
 
+                        lots.removeIf(lot ->
+                                lot.district == null
+                                        || selectedDistrict == null
+                                        || !lot.district.trim()
+                                        .equalsIgnoreCase(selectedDistrict.trim())
+                        );
+
+                        if (!searchQuery.isEmpty()) {
+                            lots.removeIf(lot ->
+                                    lot.name == null
+                                            || !lot.name.toLowerCase()
+                                            .contains(searchQuery.toLowerCase())
+                            );
+                        }
+
+
+                        if (lots.isEmpty()) {
+
+                            Ui.toast(
+                                    HomeActivity.this,
+                                    "No parking lots found in "
+                                            + selectedDistrict
+                            );
+
+                            return;
+                        }
+
+
+                        if (sortByAvailableSlots) {
+                            lots.sort((lot1, lot2) ->
+                                    Integer.compare(
+                                            lot2.availableSlots != null ? lot2.availableSlots : 0,
+                                            lot1.availableSlots != null ? lot1.availableSlots : 0
+                                    )
+                            );
+                        } else {
+                            lots.sort(Comparator.comparingDouble(
+                                    (ParkingLot lot) -> calculateDistance(lot)
+                            ));
+                        }
+
+                        for (ParkingLot lot : lots) {
                             addParkingCard(lot);
                         }
                     }
@@ -409,6 +642,60 @@ public class HomeActivity extends AppCompatActivity {
 
         info.addView(
                 location
+        );
+        TextView distance =
+                new TextView(
+                        HomeActivity.this
+                );
+
+        float distanceMeters =
+                calculateDistance(lot);
+
+        if (distanceMeters == Float.MAX_VALUE) {
+
+            distance.setText(
+                    "Distance unavailable"
+            );
+
+        } else if (distanceMeters < 1000) {
+
+            distance.setText(
+                    Math.round(distanceMeters) + " m away"
+            );
+
+        } else {
+
+            distance.setText(
+                    String.format(
+                            java.util.Locale.getDefault(),
+                            "%.1f km away",
+                            distanceMeters / 1000
+                    )
+            );
+        }
+
+        distance.setTextColor(
+                0xFFD0D8E0
+        );
+
+        distance.setTextSize(
+                TypedValue.COMPLEX_UNIT_SP,
+                12
+        );
+
+        distance.setSingleLine(
+                true
+        );
+
+        distance.setPadding(
+                0,
+                dp(3),
+                0,
+                0
+        );
+
+        info.addView(
+                distance
         );
 
         LinearLayout.LayoutParams infoParams =
@@ -706,9 +993,5 @@ public class HomeActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
-        if (list != null) {
-            loadParkingLots();
-        }
     }
 }

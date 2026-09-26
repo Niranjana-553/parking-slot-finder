@@ -1,8 +1,10 @@
 package com.parkingslot.parking_backend.controller;
-
+import com.parkingslot.parking_backend.model.ParkingLot;
+import com.parkingslot.parking_backend.model.ParkingSlotResponse;
 import com.parkingslot.parking_backend.model.ParkingSlot;
+import com.parkingslot.parking_backend.repository.ParkingLotRepository;
 import com.parkingslot.parking_backend.repository.ParkingSlotRepository;
-
+import com.parkingslot.parking_backend.repository.ParkingLotRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,11 +13,16 @@ import java.util.List;
 @RequestMapping("/api/parking-slots")
 public class ParkingSlotController {
 
+    private final ParkingLotRepository parkingLotRepository;
     private final ParkingSlotRepository parkingSlotRepository;
 
-    public ParkingSlotController(ParkingSlotRepository parkingSlotRepository) {
-        this.parkingSlotRepository = parkingSlotRepository;
-    }
+    public ParkingSlotController(
+        ParkingSlotRepository parkingSlotRepository,
+        ParkingLotRepository parkingLotRepository) {
+
+    this.parkingSlotRepository = parkingSlotRepository;
+    this.parkingLotRepository = parkingLotRepository;
+}
 
     // Get all parking slots
     @GetMapping
@@ -29,10 +36,30 @@ public class ParkingSlotController {
 }
 // Get available parking slots for a specific parking lot
 @GetMapping("/available/lot/{parkingLotId}")
-public List<ParkingSlot> getAvailableSlotsByParkingLot(
+public List<ParkingSlotResponse> getAvailableSlotsByParkingLot(
         @PathVariable Long parkingLotId) {
 
-    return parkingSlotRepository.findByParkingLotIdAndOccupiedFalse(parkingLotId);
+    ParkingLot parkingLot =
+            parkingLotRepository.findById(parkingLotId)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Parking lot not found"
+                            ));
+
+    List<ParkingSlot> slots =
+            parkingSlotRepository
+                    .findByParkingLotIdAndOccupiedFalse(
+                            parkingLotId
+                    );
+
+    return slots.stream()
+            .map(slot -> new ParkingSlotResponse(
+                    slot.getId(),
+                    slot.getSlotNumber(),
+                    slot.getStatus(),
+                    parkingLot.getPrice()
+            ))
+            .toList();
 }
 
     // Get one parking slot by ID

@@ -42,6 +42,12 @@ public class RegisterActivity extends AppCompatActivity {
             Ui.toast(this, "Email and password are required.");
             return;
         }
+
+        if (!ph.matches("\\d{10}")) {
+            phone.setError("Enter a valid phone number");
+            phone.requestFocus();
+            return;
+        }
         if (!p.equals(cp)) {
             Ui.toast(this, "Passwords do not match.");
             return;
@@ -71,15 +77,21 @@ public class RegisterActivity extends AppCompatActivity {
                             if (r.code() == 429) {
                                 errorMsg = "Rate limit reached. ";
                                 if (rawError.contains("email")) {
-                                    errorMsg += "Email limit exceeded. Please disable 'Confirm Email' in Supabase dashboard.";
+                                    errorMsg += "Email limit exceeded.";
                                 } else {
                                     errorMsg += "Please wait a few minutes.";
                                 }
                             } else if (rawError.contains("weak_password")) {
                                 errorMsg = "Password is too weak. Make sure it is at least 6 characters long.";
-                            } else {
-                                errorMsg += " (" + rawError + ")";
-                            }
+                            }  else if (rawError.contains("invalid_email")
+                                || rawError.contains("invalid email")
+                                || rawError.contains("email")) {
+
+                            errorMsg = "Please enter a valid email address.";
+
+                        } else {
+                            errorMsg = "Registration failed. Please check your details and try again.";
+                        }
                         } else {
                             errorMsg += " (Code: " + r.code() + ")";
                         }

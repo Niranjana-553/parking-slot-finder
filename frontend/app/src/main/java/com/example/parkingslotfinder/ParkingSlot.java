@@ -6,7 +6,10 @@ public class ParkingSlot {
 
     public Integer id;
 
-    @SerializedName("slot_number")
+    @SerializedName(
+            value = "slot_number",
+            alternate = {"slotNumber"}
+    )
     public String slotNumber;
 
     public String status;
