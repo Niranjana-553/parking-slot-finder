@@ -14,8 +14,19 @@ import java.util.Locale;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.TimePicker;
+import android.widget.AdapterView;
+import java.util.Calendar;
+import com.razorpay.Checkout;
+import com.razorpay.PaymentData;
+import com.razorpay.PaymentResultWithDataListener;
 
-public class BookingActivity extends AppCompatActivity {
+import org.json.JSONObject;
+
+public class BookingActivity extends AppCompatActivity
+implements PaymentResultWithDataListener {
 
     private Button confirmButton;
 
@@ -24,15 +35,37 @@ public class BookingActivity extends AppCompatActivity {
     private TextView durationText;
     private TextView totalText;
 
+    private TimePicker startTimePicker;
+    private Spinner durationSpinner;
+
+    private int selectedDuration = 1;
+    private double hourlyPrice = 0;
+
+    private String userId;
+    private String currentOrderId;
+
+    private int slotId;
+    private int parkingLotId;
+
+    private String startTime;
+    private String endTimeString;
+
+    private double totalPrice;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_booking);
+
+        Checkout.preload(getApplicationContext());
         slotText = findViewById(R.id.slotText);
         priceText = findViewById(R.id.priceText);
         durationText = findViewById(R.id.durationText);
         totalText = findViewById(R.id.totalText);
         confirmButton = findViewById(R.id.confirmButton);
+        startTimePicker = findViewById(R.id.startTimePicker);
+        durationSpinner = findViewById(R.id.durationSpinner);
+
         int slotId = getIntent().getIntExtra(
                 "slotId",
                  -1
@@ -101,40 +134,244 @@ public class BookingActivity extends AppCompatActivity {
                     "Price: Not specified"
             );
         }
-        durationText.setText(
-                "Duration: 1 hour"
+
+        hourlyPrice = price;
+
+        durationSpinner.setOnItemSelectedListener(
+                new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(
+                            AdapterView<?> parent,
+                            android.view.View view,
+                            int position,
+                            long id) {
+
+                        selectedDuration = position + 1;
+
+                        durationText.setText(
+                                "Duration: " + selectedDuration +
+                                        (selectedDuration == 1 ? " hour" : " hours")
+                        );
+
+                        if (hourlyPrice > 0) {
+                            totalText.setText(
+                                    "Total: ₹" +
+                                            formatPrice(hourlyPrice * selectedDuration)
+                            );
+                        } else {
+                            totalText.setText("Total: Not specified");
+                        }
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                }
         );
-        if (price > 0) {
 
-            totalText.setText(
-                    "Total: ₹"
-                            + formatPrice(price)
-            );
-
-        } else {
-
-            totalText.setText(
-                    "Total: Not specified"
-            );
-        }
         confirmButton.setOnClickListener(v -> {
 
-            if (price <= 0) {
-
+            if (hourlyPrice <= 0) {
                 Ui.toast(
                         BookingActivity.this,
                         "Price is not available."
                 );
-
                 return;
             }
 
-            createBooking(
-                    slotId,
-                    parkingLotId,
-                    price
-            );
+            startPayment(slotId, parkingLotId);
         });
+
+        String[] durations = {
+                "1 hour", "2 hours", "3 hours",
+                "4 hours", "5 hours", "6 hours",
+                "7 hours", "8 hours", "9 hours",
+                "10 hours", "11 hours", "12 hours"
+        };
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                durations
+        );
+
+        adapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+        );
+
+        durationSpinner.setAdapter(adapter);
+    }
+
+
+    private void startPayment(int slotId, int parkingLotId) {
+
+        confirmButton.setEnabled(false);
+
+        Calendar startCalendar = Calendar.getInstance();
+
+        startCalendar.set(
+                Calendar.HOUR_OF_DAY,
+                startTimePicker.getHour()
+        );
+
+        startCalendar.set(
+                Calendar.MINUTE,
+                startTimePicker.getMinute()
+        );
+
+        startCalendar.set(Calendar.SECOND, 0);
+        startCalendar.set(Calendar.MILLISECOND, 0);
+
+        Date startDate = startCalendar.getTime();
+
+        if (!startDate.after(new Date())) {
+            confirmButton.setEnabled(true);
+            Ui.toast(this, "Please select a future time.");
+            return;
+        }
+
+        Calendar endCalendar = (Calendar) startCalendar.clone();
+        endCalendar.add(Calendar.HOUR_OF_DAY, selectedDuration);
+
+        Date endDate = endCalendar.getTime();
+
+        SimpleDateFormat sdf = new SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                Locale.US
+        );
+
+        String startTime = sdf.format(startDate);
+
+        String endTimeString = sdf.format(endDate);
+
+        SessionManager sessionManager = new SessionManager(this);
+        String userId = sessionManager.getUserId();
+
+        if (userId == null || userId.isEmpty()) {
+            confirmButton.setEnabled(true);
+            Ui.toast(this, "Please login again.");
+            return;
+        }
+
+        CreatePaymentRequest request = new CreatePaymentRequest(
+                userId,
+                (long) slotId,
+                (long) parkingLotId,
+                startTime,
+                endTimeString
+        );
+
+        ParkingApi api = ApiClient.spring().create(ParkingApi.class);
+
+        api.createPaymentOrder(request).enqueue(
+                new Callback<CreatePaymentResponse>() {
+
+                    @Override
+                    public void onResponse(
+                            Call<CreatePaymentResponse> call,
+                            Response<CreatePaymentResponse> response) {
+
+                        if (!response.isSuccessful() || response.body() == null) {
+
+                            confirmButton.setEnabled(true);
+
+                            String errorMessage = "No error details available";
+
+                            try {
+                                if (response.errorBody() != null) {
+                                    errorMessage = response.errorBody().string();
+                                }
+                            } catch (Exception e) {
+                                Log.e("PAYMENT_ERROR", "Could not read error response", e);
+                            }
+
+                            Log.e(
+                                    "PAYMENT_ERROR",
+                                    "HTTP status: " + response.code()
+                                            + ", Response: " + errorMessage
+                            );
+
+                            Ui.toast(
+                                    BookingActivity.this,
+                                    "Payment order failed. HTTP " + response.code()
+                            );
+
+                            return;
+                        }
+
+                        CreatePaymentResponse payment = response.body();
+
+                        if (payment.orderId == null
+                                || payment.keyId == null
+                                || payment.amount <= 0) {
+
+                            confirmButton.setEnabled(true);
+                            Ui.toast(
+                                    BookingActivity.this,
+                                    "Invalid payment details."
+                            );
+                            return;
+                        }
+
+                        currentOrderId = payment.orderId;
+
+                        openRazorpayCheckout(payment);
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<CreatePaymentResponse> call,
+                            Throwable t) {
+
+                        confirmButton.setEnabled(true);
+
+                        Log.e("PAYMENT_ERROR", "Order creation failed", t);
+
+                        Ui.toast(
+                                BookingActivity.this,
+                                "Could not connect to backend."
+                        );
+                    }
+                }
+        );
+    }
+
+
+    private void openRazorpayCheckout(CreatePaymentResponse payment) {
+
+        try {
+            Checkout checkout = new Checkout();
+            checkout.setKeyID(payment.keyId);
+
+            JSONObject options = new JSONObject();
+
+            options.put("name", "ParkNow");
+            options.put("description", "Parking slot booking");
+            options.put("order_id", payment.orderId);
+            options.put("currency", payment.currency);
+            options.put("amount", payment.amount);
+
+            SessionManager sessionManager = new SessionManager(this);
+            String email = sessionManager.getEmail();
+
+            JSONObject prefill = new JSONObject();
+
+            if (email != null && !email.isEmpty()) {
+                prefill.put("email", email);
+            }
+
+            options.put("prefill", prefill);
+
+            checkout.open(this, options);
+
+        } catch (Exception e) {
+
+            confirmButton.setEnabled(true);
+
+            Log.e("PAYMENT_ERROR", "Could not open Razorpay", e);
+
+            Ui.toast(this, "Unable to open payment screen.");
+        }
     }
 
 
@@ -145,11 +382,38 @@ public class BookingActivity extends AppCompatActivity {
     ) {
         confirmButton.setEnabled(false);
 
-        Date now = new Date();
-        Date endTime = new Date(
-                now.getTime()
-                        + (60 * 60 * 1000)
+        Calendar startCalendar = Calendar.getInstance();
+
+        startCalendar.set(
+                Calendar.HOUR_OF_DAY,
+                startTimePicker.getHour()
         );
+
+        startCalendar.set(
+                Calendar.MINUTE,
+                startTimePicker.getMinute()
+        );
+
+        startCalendar.set(Calendar.SECOND, 0);
+        startCalendar.set(Calendar.MILLISECOND, 0);
+
+        Date startDate = startCalendar.getTime();
+        if (startDate.before(new Date())) {
+            confirmButton.setEnabled(true);
+
+            Ui.toast(
+                    BookingActivity.this,
+                    "Please select a future time."
+            );
+
+            return;
+        }
+
+        Calendar endCalendar = (Calendar) startCalendar.clone();
+
+        endCalendar.add(Calendar.HOUR_OF_DAY, selectedDuration);
+
+        Date endTime = endCalendar.getTime();
 
 
         SimpleDateFormat sdf =
@@ -158,7 +422,7 @@ public class BookingActivity extends AppCompatActivity {
                         Locale.US
                 );
 
-        String startTime = sdf.format(now);
+        String startTime = sdf.format(startDate);
 
         String endTimeString = sdf.format(endTime);
         SessionManager sessionManager =
@@ -204,8 +468,9 @@ public class BookingActivity extends AppCompatActivity {
                             Ui.toast(
                                     BookingActivity.this,
                                     "Booking confirmed! ₹"
-                                            + formatPrice(price)
-                                            + " for 1 hour."
+                                            + formatPrice(price * selectedDuration)
+                                            + " for " + selectedDuration
+                                            + (selectedDuration == 1 ? " hour." : " hours.")
                             );
 
                             finish();
@@ -213,41 +478,32 @@ public class BookingActivity extends AppCompatActivity {
                             return;
                         }
 
-                        String errorMessage =
-                                "Booking failed ("
-                                        + response.code()
-                                        + ")";
+
+                        String errorMessage = "Booking failed. Please try again.";
 
                         try {
-
                             if (response.errorBody() != null) {
+                                String errorBody = response.errorBody().string();
 
-                                String errorBody =
-                                        response.errorBody()
-                                                .string();
+                                Log.e("BOOKING_ERROR", errorBody);
 
-                                Log.e(
-                                        "BOOKING_ERROR",
-                                        errorBody
+                                org.json.JSONObject json =
+                                        new org.json.JSONObject(errorBody);
+
+                                errorMessage = json.optString(
+                                        "message",
+                                        json.optString(
+                                                "detail",
+                                                "Booking failed. Please try again."
+                                        )
                                 );
-
-                                errorMessage +=
-                                        ": " + errorBody;
                             }
-
                         } catch (Exception e) {
-
-                            Log.e(
-                                    "BOOKING_ERROR",
-                                    "Could not read error response",
-                                    e
-                            );
+                            Log.e("BOOKING_ERROR", "Could not parse error", e);
                         }
 
-                        Ui.toast(
-                                BookingActivity.this,
-                                errorMessage
-                        );
+                        Ui.toast(BookingActivity.this, errorMessage);
+
                     }
 
                     @Override
@@ -287,5 +543,97 @@ public class BookingActivity extends AppCompatActivity {
                 "%.2f",
                 price
         );
+    }
+    @Override
+    public void onPaymentSuccess(
+            String razorpayPaymentID,
+            PaymentData paymentData) {
+
+        String orderId = paymentData.getOrderId();
+
+        if (orderId == null || orderId.isEmpty()) {
+            orderId = currentOrderId;
+        }
+
+        String paymentId = paymentData.getPaymentId();
+        String signature = paymentData.getSignature();
+
+        if (orderId == null || paymentId == null || signature == null) {
+            Ui.toast(this, "Payment details are incomplete.");
+            confirmButton.setEnabled(true);
+            return;
+        }
+
+        VerifyPaymentRequest request = new VerifyPaymentRequest(
+                orderId,
+                paymentId,
+                signature
+        );
+
+        ParkingApi api = ApiClient.spring().create(ParkingApi.class);
+
+        api.verifyPayment(request).enqueue(
+                new Callback<Booking>() {
+
+                    @Override
+                    public void onResponse(
+                            Call<Booking> call,
+                            Response<Booking> response) {
+
+                        confirmButton.setEnabled(true);
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            Ui.toast(
+                                    BookingActivity.this,
+                                    "Payment verified! Booking confirmed."
+                            );
+                            finish();
+                        }
+                        else {
+                            String errorMessage = "No error details available";
+
+                            try {
+                                if (response.errorBody() != null) {
+                                    errorMessage = response.errorBody().string();
+                                }
+                            } catch (Exception e) {
+                                Log.e("PAYMENT_VERIFY", "Could not read error", e);
+                            }
+
+                            Log.e("PAYMENT_VERIFY",
+                                    "HTTP status: " + response.code()
+                                            + ", Response: " + errorMessage);
+
+                            Ui.toast(BookingActivity.this,
+                                    "Verification failed: HTTP " + response.code());
+                        }
+
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<Booking> call,
+                            Throwable t) {
+
+                        confirmButton.setEnabled(true);
+
+                        Log.e("PAYMENT_VERIFY", "Verification request failed", t);
+
+                        Ui.toast(
+                                BookingActivity.this,
+                                "Could not verify payment."
+                        );
+                    }
+                }
+        );
+    }
+
+    @Override
+    public void onPaymentError(
+            int code,
+            String description,
+            PaymentData paymentData) {
+
+        Ui.toast(this, "Payment failed: " + description);
     }
 }

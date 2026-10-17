@@ -3,8 +3,6 @@ package com.example.parkingslotfinder;
 import java.util.List;
 import retrofit2.Call;
 import retrofit2.http.Body;
-import retrofit2.http.Field;
-import retrofit2.http.FormUrlEncoded;
 import retrofit2.http.GET;
 import retrofit2.http.PUT;
 import retrofit2.http.POST;
@@ -47,4 +45,28 @@ public interface ParkingApi {
 
     @PUT("api/notifications/{notificationId}/read")
     Call<NotificationItem> markNotificationRead(@Path("notificationId") String notificationId);
+
+
+    @GET("api/ratings/lot/{parkingLotId}")
+    Call<RatingSummary> getRatingSummary(
+            @Path("parkingLotId") int parkingLotId
+    );
+
+    @POST("api/ratings")
+    Call<java.util.Map<String, String>> submitRating(
+            @Query("userId") String userId,
+            @Query("parkingLotId") int parkingLotId,
+            @Query("rating") int rating
+    );
+
+    @POST("api/payments/create-order")
+    Call<CreatePaymentResponse> createPaymentOrder(
+            @Body CreatePaymentRequest request
+    );
+
+    @POST("api/payments/verify")
+    Call<Booking> verifyPayment(
+            @Body VerifyPaymentRequest request
+    );
+
 }

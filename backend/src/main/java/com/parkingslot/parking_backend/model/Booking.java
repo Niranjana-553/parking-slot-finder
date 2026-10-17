@@ -30,6 +30,9 @@ public class Booking {
     @Column(name = "end_time", nullable = false)
     private OffsetDateTime endTime;
 
+    @Column(name = "total_cost")
+    private Double totalCost;
+
     @Column(nullable = false)
     private String status;
 
@@ -112,5 +115,13 @@ public class Booking {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Double getTotalCost() {
+    return totalCost;
+    }
+
+    public void setTotalCost(Double totalCost) {
+        this.totalCost = totalCost;
     }
 }

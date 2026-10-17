@@ -16,6 +16,8 @@ import retrofit2.Response;
 public class SlotActivity extends AppCompatActivity {
 
     private LinearLayout list;
+    private TextView ratingText;
+    private android.widget.Button rateParkingButton;
 
     private int lotId;
     private String parkingLotName;
@@ -28,6 +30,8 @@ public class SlotActivity extends AppCompatActivity {
 
 
         list = findViewById(R.id.slotList);
+        ratingText = findViewById(R.id.ratingText);
+        rateParkingButton = findViewById(R.id.rateParkingButton);
 
         TextView title = findViewById(R.id.title);
 
@@ -62,9 +66,12 @@ public class SlotActivity extends AppCompatActivity {
 
             return;
         }
+        loadRatingSummary();
 
-
+        rateParkingButton.setOnClickListener(v -> showRatingDialog());
         loadSlots(lotId);
+
+        ratingText.setOnClickListener(v -> showRatingDialog());
     }
 
 
@@ -265,6 +272,120 @@ public class SlotActivity extends AppCompatActivity {
                     }
                 }
         );
+    }
+
+    private void loadRatingSummary() {
+        ParkingApi api = ApiClient.spring()
+                .create(ParkingApi.class);
+
+        api.getRatingSummary(lotId).enqueue(
+                new Callback<RatingSummary>() {
+                    @Override
+                    public void onResponse(
+                            Call<RatingSummary> call,
+                            Response<RatingSummary> response) {
+
+                        if (response.isSuccessful()
+                                && response.body() != null) {
+
+                            RatingSummary summary = response.body();
+
+                            if (summary.ratingCount == 0) {
+                                ratingText.setText(
+                                        "⭐ No ratings yet"
+                                );
+                            } else {
+                                ratingText.setText(
+                                        String.format(
+                                                java.util.Locale.US,
+                                                "⭐ %.1f (%d reviews)",
+                                                summary.averageRating,
+                                                summary.ratingCount
+                                        )
+                                );
+                            }
+                        } else {
+                            ratingText.setText("Rating unavailable");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<RatingSummary> call,
+                            Throwable t) {
+                        ratingText.setText("Rating unavailable");
+                    }
+                }
+        );
+    }
+
+    private void showRatingDialog() {
+        SessionManager session = new SessionManager(this);
+        String userId = session.getUserId();
+
+        if (userId == null || userId.isEmpty()) {
+            Ui.toast(this, "Please log in to rate.");
+            return;
+        }
+
+        String[] choices = {
+                "⭐ 1 star",
+                "⭐⭐ 2 stars",
+                "⭐⭐⭐ 3 stars",
+                "⭐⭐⭐⭐ 4 stars",
+                "⭐⭐⭐⭐⭐ 5 stars"
+        };
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Rate " + parkingLotName)
+                .setSingleChoiceItems(choices, -1, (dialog, which) -> {
+                    int rating = which + 1;
+                    dialog.dismiss();
+
+                    ParkingApi api = ApiClient.spring()
+                            .create(ParkingApi.class);
+
+                    api.submitRating(userId, lotId, rating).enqueue(
+                            new Callback<java.util.Map<String, String>>() {
+                                @Override
+                                public void onResponse(
+                                        Call<java.util.Map<String, String>> call,
+                                        Response<java.util.Map<String, String>> response) {
+
+                                    if (response.isSuccessful()) {
+                                        Ui.toast(
+                                                SlotActivity.this,
+                                                "Rating submitted!"
+                                        );
+                                        loadRatingSummary();
+                                    } else if (response.code() == 403) {
+                                        Ui.toast(
+                                                SlotActivity.this,
+                                                "You need a confirmed booking to rate this parking lot."
+                                        );
+                                    } else {
+                                        Ui.toast(
+                                                SlotActivity.this,
+                                                "Could not submit rating (" +
+                                                        response.code() + ")."
+                                        );
+                                    }
+                                }
+
+                                @Override
+                                public void onFailure(
+                                        Call<java.util.Map<String, String>> call,
+                                        Throwable t) {
+                                    Ui.toast(
+                                            SlotActivity.this,
+                                            "Backend error: " + t.getMessage()
+                                    );
+                                }
+                            }
+                    );
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
 

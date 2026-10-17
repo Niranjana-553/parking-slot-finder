@@ -14,6 +14,10 @@ import java.util.Map;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 public class MyBookingsActivity extends AppCompatActivity {
 
@@ -195,9 +199,9 @@ public class MyBookingsActivity extends AppCompatActivity {
                                     );
 
                             details.append("\n")
-                                    .append(b.startTime)
+                                    .append(formatBookingTime(b.startTime))
                                     .append(" → ")
-                                    .append(b.endTime);
+                                    .append(formatBookingTime(b.endTime));
 
                             details.append("\nStatus: ")
                                     .append(
@@ -255,6 +259,19 @@ public class MyBookingsActivity extends AppCompatActivity {
                         );
                     }
                 });
+    }
+
+    private String formatBookingTime(String time) {
+        try {
+            return OffsetDateTime.parse(time)
+                    .atZoneSameInstant(ZoneId.of("Asia/Kolkata"))
+                    .format(DateTimeFormatter.ofPattern(
+                            "dd MMM, hh:mm a",
+                            Locale.getDefault()
+                    ));
+        } catch (Exception e) {
+            return time;
+        }
     }
 
     private void cancelBooking(String id) {

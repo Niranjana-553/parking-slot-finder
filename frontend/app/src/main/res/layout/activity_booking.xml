@@ -57,6 +57,33 @@
             android:textSize="18sp"
             android:paddingBottom="15dp" />
 
+
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Start time"
+            android:textSize="16sp" />
+
+        <TimePicker
+            android:id="@+id/startTimePicker"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:timePickerMode="spinner"
+           />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Parking duration"
+            android:textSize="16sp" />
+
+        <Spinner
+            android:id="@+id/durationSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+
         <!-- Duration -->
 
         <TextView

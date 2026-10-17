@@ -47,10 +47,7 @@ public List<ParkingSlotResponse> getAvailableSlotsByParkingLot(
                             ));
 
     List<ParkingSlot> slots =
-            parkingSlotRepository
-                    .findByParkingLotIdAndOccupiedFalse(
-                            parkingLotId
-                    );
+        parkingSlotRepository.findByParkingLotId(parkingLotId);
 
     return slots.stream()
             .map(slot -> new ParkingSlotResponse(

@@ -30,6 +30,8 @@ import java.util.Comparator;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import android.net.Uri;
+import android.widget.Toast;
 
 public class HomeActivity extends AppCompatActivity {
 
@@ -126,7 +128,7 @@ public class HomeActivity extends AppCompatActivity {
 
                     .show();
 
-            
+
 
             searchText.addTextChangedListener(new TextWatcher() {
                 @Override
@@ -698,6 +700,24 @@ public class HomeActivity extends AppCompatActivity {
                 distance
         );
 
+
+        TextView ratingText = new TextView(this);
+
+        ratingText.setText("No ratings yet");
+        ratingText.setTextColor(0xFFFFD54F);
+        ratingText.setTextSize(
+                TypedValue.COMPLEX_UNIT_SP, 12
+        );
+
+        ratingText.setPadding(0, dp(4), 0, 0);
+
+        info.addView(ratingText);
+
+        loadRatingSummary(lot.id, ratingText);
+
+
+
+
         LinearLayout.LayoutParams infoParams =
                 new LinearLayout.LayoutParams(
                         0,
@@ -868,6 +888,26 @@ public class HomeActivity extends AppCompatActivity {
         );
 
 
+        TextView navigateButton = new TextView(this);
+
+        navigateButton.setText("Navigate →");
+        navigateButton.setTextColor(0xFF00FF88);
+        navigateButton.setTextSize(
+                TypedValue.COMPLEX_UNIT_SP, 12
+        );
+        navigateButton.setGravity(Gravity.CENTER);
+        navigateButton.setPadding(
+                dp(8), dp(8), dp(8), dp(8)
+        );
+
+        navigateButton.setOnClickListener(v -> {
+            openGoogleMaps(lot);
+        });
+
+        card.addView(navigateButton);
+
+
+
 
         card.setOnClickListener(v -> {
 
@@ -918,6 +958,137 @@ public class HomeActivity extends AppCompatActivity {
                 number
         );
     }
+
+
+    private void loadRatingSummary(
+            Integer parkingLotId,
+            TextView ratingText) {
+
+        ParkingApi api =
+                ApiClient.spring().create(ParkingApi.class);
+
+        api.getRatingSummary(parkingLotId)
+                .enqueue(new Callback<RatingSummary>() {
+
+                    @Override
+                    public void onResponse(
+                            Call<RatingSummary> call,
+                            Response<RatingSummary> response) {
+
+                        if (response.isSuccessful()
+                                && response.body() != null) {
+
+                            RatingSummary summary = response.body();
+
+                            if (summary.ratingCount == 0) {
+                                ratingText.setText("★ No ratings yet");
+                            } else {
+                                ratingText.setText(
+                                        "★ " + summary.averageRating
+                                                + " (" + summary.ratingCount + ")"
+                                );
+                            }
+                        } else {
+                            ratingText.setText("★ Not available");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<RatingSummary> call,
+                            Throwable t) {
+                        ratingText.setText("★ Not available");
+                    }
+                });
+    }
+
+
+    private void showRatingDialog(
+            Integer parkingLotId,
+            TextView ratingText) {
+
+        SessionManager session = new SessionManager(this);
+        String userId = session.getUserId();
+
+        if (userId == null || userId.isEmpty()) {
+            Ui.toast(this, "Please log in first.");
+            return;
+        }
+
+        String[] stars = {
+                "★", "★★", "★★★", "★★★★", "★★★★★"
+        };
+
+        int[] selectedRating = {0};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Rate this parking lot")
+                .setSingleChoiceItems(
+                        stars, -1,
+                        (dialog, which) ->
+                                selectedRating[0] = which + 1
+                )
+                .setPositiveButton("Submit", (dialog, which) -> {
+
+                    if (selectedRating[0] == 0) {
+                        Ui.toast(this, "Select a rating first.");
+                        return;
+                    }
+
+                    ParkingApi api =
+                            ApiClient.spring()
+                                    .create(ParkingApi.class);
+
+                    api.submitRating(
+                            userId,
+                            parkingLotId,
+                            selectedRating[0]
+                    ).enqueue(new Callback<java.util.Map<String, String>>() {
+
+                        @Override
+                        public void onResponse(
+                                Call<java.util.Map<String, String>> call,
+                                Response<java.util.Map<String, String>> response) {
+
+                            if (response.isSuccessful()) {
+                                Ui.toast(
+                                        HomeActivity.this,
+                                        "Rating submitted!"
+                                );
+
+                                loadRatingSummary(
+                                        parkingLotId, ratingText
+                                );
+                            } else if (response.code() == 403) {
+                                Ui.toast(
+                                        HomeActivity.this,
+                                        "Book this parking lot before rating."
+                                );
+                            } else {
+                                Ui.toast(
+                                        HomeActivity.this,
+                                        "Could not submit rating."
+                                );
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(
+                                Call<java.util.Map<String, String>> call,
+                                Throwable t) {
+
+                            Ui.toast(
+                                    HomeActivity.this,
+                                    "Unable to connect to backend."
+                            );
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+
 
 
     private void loadLiveSlotCount(
@@ -994,4 +1165,48 @@ public class HomeActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
     }
+
+
+    private void openGoogleMaps(ParkingLot lot) {
+
+        if (lot.latitude == null || lot.longitude == null) {
+            Toast.makeText(
+                    this,
+                    "Location coordinates unavailable",
+                    Toast.LENGTH_SHORT
+            ).show();
+            return;
+        }
+
+        Uri uri = Uri.parse(
+                "google.navigation:q="
+                        + lot.latitude + ","
+                        + lot.longitude
+        );
+
+        Intent intent = new Intent(
+                Intent.ACTION_VIEW,
+                uri
+        );
+
+        intent.setPackage("com.google.android.apps.maps");
+
+        try {
+            startActivity(intent);
+        } catch (android.content.ActivityNotFoundException e) {
+            Uri webUri = Uri.parse(
+                    "https://www.google.com/maps/dir/?api=1"
+                            + "&destination="
+                            + lot.latitude + ","
+                            + lot.longitude
+                            + "&travelmode=driving"
+            );
+
+            startActivity(new Intent(
+                    Intent.ACTION_VIEW,
+                    webUri
+            ));
+        }
+    }
+
 }

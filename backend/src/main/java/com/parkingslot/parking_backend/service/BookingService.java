@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.UUID;
 import com.parkingslot.parking_backend.model.Notification;
 import com.parkingslot.parking_backend.repository.NotificationRepository;
+import java.math.BigDecimal;
+import java.time.Duration;
 
 @Service
 public class BookingService {
@@ -46,11 +48,18 @@ public class BookingService {
             OffsetDateTime endTime) {
 
         // 1. Check that end time is after start time
-        if (!endTime.isAfter(startTime)) {
-            throw new RuntimeException(
-                    "End time must be after start time"
-            );
-        }
+        // 1. Validate booking times
+if (startTime == null || endTime == null) {
+    throw new RuntimeException("Start time and end time are required");
+}
+
+if (!endTime.isAfter(startTime)) {
+    throw new RuntimeException("End time must be after start time");
+}
+
+if (!startTime.isAfter(OffsetDateTime.now())) {
+    throw new RuntimeException("Start time must be in the future");
+}
 
         // 2. Find the parking slot
         ParkingSlot slot = parkingSlotRepository.findById(parkingSlotId)
@@ -64,14 +73,46 @@ public class BookingService {
             );
         }
 
-        // 4. Check whether slot is already occupied
-        if (Boolean.TRUE.equals(slot.getOccupied())
-                || !"available".equalsIgnoreCase(slot.getStatus())) {
+        // Check for overlapping confirmed bookings
+boolean overlaps =
+        bookingRepository
+                .existsByParkingSlotIdAndStatusAndStartTimeLessThanAndEndTimeGreaterThan(
+                        parkingSlotId,
+                        "confirmed",
+                        endTime,
+                        startTime
+                );
 
-            throw new RuntimeException(
-                    "Parking slot is not available"
-            );
+if (overlaps) {
+    throw new RuntimeException(
+            "This slot is already booked for the selected time."
+    );
+}
+
+      
+        
+        // Calculate total booking cost
+        ParkingLot parkingLot = parkingLotRepository.findById(parkingLotId)
+                .orElseThrow(() ->
+                        new RuntimeException("Parking lot not found"));
+
+        BigDecimal hourlyPrice = parkingLot.getPrice();
+
+        if (hourlyPrice == null || hourlyPrice.compareTo(BigDecimal.ZERO) < 0) {
+                throw new RuntimeException("Invalid parking price");
         }
+
+        long durationMinutes = Duration.between(startTime, endTime).toMinutes();
+
+        if (Duration.between(startTime, endTime).getSeconds() % 60 != 0) {
+                durationMinutes++;
+        }
+
+        BigDecimal durationHours = BigDecimal.valueOf(durationMinutes)
+                .divide(BigDecimal.valueOf(60), 4, java.math.RoundingMode.UP);
+
+        BigDecimal totalCost = hourlyPrice.multiply(durationHours)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
 
         // 5. Create booking
         Booking booking = new Booking();
@@ -82,43 +123,25 @@ public class BookingService {
         booking.setBookingTime(OffsetDateTime.now());
         booking.setStartTime(startTime);
         booking.setEndTime(endTime);
+        booking.setTotalCost(totalCost.doubleValue());
         booking.setStatus("confirmed");
         booking.setCreatedAt(OffsetDateTime.now());
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // 6. Mark slot as reserved
-        slot.setStatus("reserved");
-        slot.setOccupied(true);
+        // Create booking notification
+Notification notification = new Notification();
 
-        parkingSlotRepository.save(slot);
-
-        // 7. Decrease available slots in parking lot
-        ParkingLot parkingLot = parkingLotRepository.findById(parkingLotId)
-                .orElseThrow(() ->
-                        new RuntimeException("Parking lot not found"));
-
-        if (parkingLot.getAvailableSlots() > 0) {
-            parkingLot.setAvailableSlots(
-                    parkingLot.getAvailableSlots() - 1
-            );
-
-            parkingLotRepository.save(parkingLot);
-            // Create booking notification
-            Notification notification = new Notification();
-
-    notification.setUserId(userId);
-    notification.setTitle("Booking Confirmed");
-    notification.setMessage(
+notification.setUserId(userId);
+notification.setTitle("Booking Confirmed");
+notification.setMessage(
         "Your parking slot " + slot.getSlotNumber()
         + " has been booked successfully."
-    );
-    notification.setRead(false);
-    notification.setCreatedAt(OffsetDateTime.now());
+);
+notification.setRead(false);
+notification.setCreatedAt(OffsetDateTime.now());
 
-    notificationRepository.save(notification);
-
-        }
+notificationRepository.save(notification);
 
         return savedBooking;
     }
@@ -158,23 +181,8 @@ public Booking cancelBooking(Long bookingId) {
     ).orElseThrow(() ->
             new RuntimeException("Parking slot not found"));
 
-    // 4. Make the slot available again
-    slot.setStatus("available");
-    slot.setOccupied(false);
-
-    parkingSlotRepository.save(slot);
-
-    // 5. Increase available slots in parking lot
-    ParkingLot parkingLot = parkingLotRepository.findById(
-            booking.getParkingLotId()
-    ).orElseThrow(() ->
-            new RuntimeException("Parking lot not found"));
-
-    parkingLot.setAvailableSlots(
-            parkingLot.getAvailableSlots() + 1
-    );
-
-    parkingLotRepository.save(parkingLot);
+ 
+    
 
     // 6. Update booking status
     booking.setStatus("cancelled");
@@ -193,6 +201,16 @@ notification.setCreatedAt(OffsetDateTime.now());
 
 notificationRepository.save(notification);
     return bookingRepository.save(booking);
+}
+
+public boolean hasOverlappingBooking(
+        Long parkingSlotId,
+        OffsetDateTime startTime,
+        OffsetDateTime endTime) {
+
+    return bookingRepository
+            .existsByParkingSlotIdAndStatusAndStartTimeLessThanAndEndTimeGreaterThan(
+                    parkingSlotId, "confirmed", endTime, startTime);
 }
 
 }
