@@ -34,6 +34,13 @@ implements PaymentResultWithDataListener {
     private TextView priceText;
     private TextView durationText;
     private TextView totalText;
+    private TextView availabilityText;
+
+    private boolean isAvailabilityKnown = false;
+    private boolean isSlotAvailable = false;
+
+    private retrofit2.Call<AvailabilityResponse> availabilityCall;
+    private int availabilityCheckId = 0;
 
     private TimePicker startTimePicker;
     private Spinner durationSpinner;
@@ -65,16 +72,10 @@ implements PaymentResultWithDataListener {
         confirmButton = findViewById(R.id.confirmButton);
         startTimePicker = findViewById(R.id.startTimePicker);
         durationSpinner = findViewById(R.id.durationSpinner);
+        availabilityText = findViewById(R.id.availabilityText);
 
-        int slotId = getIntent().getIntExtra(
-                "slotId",
-                 -1
-        );
-
-        int parkingLotId = getIntent().getIntExtra(
-                "parkingLotId",
-                -1
-        );
+        slotId = getIntent().getIntExtra("slotId", -1);
+        parkingLotId = getIntent().getIntExtra("parkingLotId", -1);
 
         String slotNumber = getIntent().getStringExtra(
                 "slotNumber"
@@ -161,6 +162,7 @@ implements PaymentResultWithDataListener {
                         } else {
                             totalText.setText("Total: Not specified");
                         }
+                        checkAvailability();
                     }
 
                     @Override
@@ -169,7 +171,16 @@ implements PaymentResultWithDataListener {
                 }
         );
 
+        startTimePicker.setOnTimeChangedListener(
+                (view, hourOfDay, minute) -> checkAvailability()
+        );
+
         confirmButton.setOnClickListener(v -> {
+
+            if (!isAvailabilityKnown || !isSlotAvailable) {
+                Ui.toast(this, "Please check slot availability first.");
+                return;
+            }
 
             if (hourlyPrice <= 0) {
                 Ui.toast(
@@ -200,7 +211,9 @@ implements PaymentResultWithDataListener {
         );
 
         durationSpinner.setAdapter(adapter);
+        checkAvailability();
     }
+
 
 
     private void startPayment(int slotId, int parkingLotId) {
@@ -331,6 +344,117 @@ implements PaymentResultWithDataListener {
                                 BookingActivity.this,
                                 "Could not connect to backend."
                         );
+                    }
+                }
+        );
+    }
+
+    private void checkAvailability() {
+
+        // Ignore responses from older checks.
+        int checkId = ++availabilityCheckId;
+
+        if (availabilityCall != null) {
+            availabilityCall.cancel();
+        }
+
+        isAvailabilityKnown = false;
+        isSlotAvailable = false;
+        confirmButton.setEnabled(false);
+
+        Calendar startCalendar = Calendar.getInstance();
+        startCalendar.set(Calendar.HOUR_OF_DAY, startTimePicker.getHour());
+        startCalendar.set(Calendar.MINUTE, startTimePicker.getMinute());
+        startCalendar.set(Calendar.SECOND, 0);
+        startCalendar.set(Calendar.MILLISECOND, 0);
+
+        Date startDate = startCalendar.getTime();
+
+        if (!startDate.after(new Date())) {
+            availabilityText.setText(
+                    "Select a future start time."
+            );
+            return;
+        }
+
+        Calendar endCalendar = (Calendar) startCalendar.clone();
+        endCalendar.add(Calendar.HOUR_OF_DAY, selectedDuration);
+
+        SimpleDateFormat sdf = new SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                Locale.US
+        );
+
+        String start = sdf.format(startDate);
+        String end = sdf.format(endCalendar.getTime());
+
+        availabilityText.setText("Checking availability...");
+
+        ParkingApi api = ApiClient.spring().create(ParkingApi.class);
+
+        availabilityCall = api.checkAvailability(slotId, start, end);
+
+        availabilityCall.enqueue(
+                new Callback<AvailabilityResponse>() {
+
+                    @Override
+                    public void onResponse(
+                            Call<AvailabilityResponse> call,
+                            Response<AvailabilityResponse> response) {
+
+                        if (checkId != availabilityCheckId) {
+                            return;
+                        }
+
+                        if (!response.isSuccessful()
+                                || response.body() == null) {
+
+                            availabilityText.setText(
+                                    "Could not check availability. Try again."
+                            );
+
+                            confirmButton.setEnabled(false);
+                            return;
+                        }
+
+                        isAvailabilityKnown = true;
+                        isSlotAvailable = response.body().available;
+
+                        if (isSlotAvailable) {
+                            availabilityText.setText(
+                                    "✓ Available for selected time"
+                            );
+                            confirmButton.setEnabled(true);
+                        } else {
+                            availabilityText.setText(
+                                    "✕ Already booked for this time. " +
+                                            "Please select another time."
+                            );
+                            confirmButton.setEnabled(false);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<AvailabilityResponse> call,
+                            Throwable t) {
+
+                        if (checkId != availabilityCheckId) {
+                            return;
+                        }
+
+                        if (call.isCanceled()) {
+                            return;
+                        }
+
+                        isAvailabilityKnown = false;
+                        isSlotAvailable = false;
+
+                        availabilityText.setText(
+                                "Could not check availability. Try again."
+                        );
+
+                        confirmButton.setEnabled(false);
                     }
                 }
         );

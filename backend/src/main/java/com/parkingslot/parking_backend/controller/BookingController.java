@@ -9,6 +9,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import java.util.Map;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
@@ -61,5 +64,25 @@ public class BookingController {
     @PutMapping("/{bookingId}/cancel")
     public Booking cancelBooking(@PathVariable Long bookingId) {
     return bookingService.cancelBooking(bookingId);
+}
+
+@GetMapping("/availability")
+public Map<String, Boolean> checkAvailability(
+        @RequestParam Long parkingSlotId,
+        @RequestParam OffsetDateTime startTime,
+        @RequestParam OffsetDateTime endTime) {
+
+    if (!endTime.isAfter(startTime)) {
+        throw new IllegalArgumentException(
+                "End time must be after start time");
+    }
+
+    boolean available = !bookingService.hasOverlappingBooking(
+            parkingSlotId,
+            startTime,
+            endTime
+    );
+
+    return Map.of("available", available);
 }
 }

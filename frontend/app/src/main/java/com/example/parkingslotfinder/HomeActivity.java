@@ -113,6 +113,8 @@ public class HomeActivity extends AppCompatActivity {
                     "Kasaragod"
             };
 
+
+
             new AlertDialog.Builder(HomeActivity.this)
                     .setTitle("Select District")
                     .setItems(districts, (dialog, which) -> {
@@ -927,6 +929,11 @@ public class HomeActivity extends AppCompatActivity {
                     lot.name
             );
 
+            intent.putExtra(
+                    "parkingLotAddress",
+                    lot.address
+            );
+
             startActivity(
                     intent
             );
@@ -1002,95 +1009,6 @@ public class HomeActivity extends AppCompatActivity {
                 });
     }
 
-
-    private void showRatingDialog(
-            Integer parkingLotId,
-            TextView ratingText) {
-
-        SessionManager session = new SessionManager(this);
-        String userId = session.getUserId();
-
-        if (userId == null || userId.isEmpty()) {
-            Ui.toast(this, "Please log in first.");
-            return;
-        }
-
-        String[] stars = {
-                "★", "★★", "★★★", "★★★★", "★★★★★"
-        };
-
-        int[] selectedRating = {0};
-
-        new AlertDialog.Builder(this)
-                .setTitle("Rate this parking lot")
-                .setSingleChoiceItems(
-                        stars, -1,
-                        (dialog, which) ->
-                                selectedRating[0] = which + 1
-                )
-                .setPositiveButton("Submit", (dialog, which) -> {
-
-                    if (selectedRating[0] == 0) {
-                        Ui.toast(this, "Select a rating first.");
-                        return;
-                    }
-
-                    ParkingApi api =
-                            ApiClient.spring()
-                                    .create(ParkingApi.class);
-
-                    api.submitRating(
-                            userId,
-                            parkingLotId,
-                            selectedRating[0]
-                    ).enqueue(new Callback<java.util.Map<String, String>>() {
-
-                        @Override
-                        public void onResponse(
-                                Call<java.util.Map<String, String>> call,
-                                Response<java.util.Map<String, String>> response) {
-
-                            if (response.isSuccessful()) {
-                                Ui.toast(
-                                        HomeActivity.this,
-                                        "Rating submitted!"
-                                );
-
-                                loadRatingSummary(
-                                        parkingLotId, ratingText
-                                );
-                            } else if (response.code() == 403) {
-                                Ui.toast(
-                                        HomeActivity.this,
-                                        "Book this parking lot before rating."
-                                );
-                            } else {
-                                Ui.toast(
-                                        HomeActivity.this,
-                                        "Could not submit rating."
-                                );
-                            }
-                        }
-
-                        @Override
-                        public void onFailure(
-                                Call<java.util.Map<String, String>> call,
-                                Throwable t) {
-
-                            Ui.toast(
-                                    HomeActivity.this,
-                                    "Unable to connect to backend."
-                            );
-                        }
-                    });
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-
-
-
     private void loadLiveSlotCount(
             Integer parkingLotId,
             TextView number
@@ -1161,10 +1079,16 @@ public class HomeActivity extends AppCompatActivity {
     }
 
 
+
     @Override
     protected void onResume() {
         super.onResume();
+
+        if (list != null && selectedDistrict != null) {
+            loadParkingLots();
+        }
     }
+
 
 
     private void openGoogleMaps(ParkingLot lot) {

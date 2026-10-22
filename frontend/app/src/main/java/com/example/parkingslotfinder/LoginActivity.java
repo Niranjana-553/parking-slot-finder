@@ -47,8 +47,15 @@ public class LoginActivity extends AppCompatActivity {
                 loginButton.setEnabled(true);
                 if (r.isSuccessful() && r.body() != null && r.body().accessToken != null
                         && r.body().user != null) {
-                    new SessionManager(LoginActivity.this).saveSession(
-                            r.body().accessToken, r.body().user.id, r.body().user.email);
+                    SessionManager session = new SessionManager(LoginActivity.this);
+
+                    session.saveSession(
+                            r.body().accessToken,
+                            r.body().user.id,
+                            r.body().user.email
+                    );
+
+                    session.savePhone(r.body().user.getPhoneNumber());
                     startActivity(new Intent(LoginActivity.this, HomeActivity.class));
                     finish();
                 } else {

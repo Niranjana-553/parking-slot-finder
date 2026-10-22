@@ -60,8 +60,16 @@ public class RegisterActivity extends AppCompatActivity {
                 registerButton.setEnabled(true);
                 if (r.isSuccessful()) {
                     if (r.body() != null && r.body().accessToken != null && r.body().user != null) {
-                        new SessionManager(RegisterActivity.this).saveSession(
-                                r.body().accessToken, r.body().user.id, r.body().user.email);
+                        SessionManager session =
+                                new SessionManager(RegisterActivity.this);
+
+                        session.saveSession(
+                                r.body().accessToken,
+                                r.body().user.id,
+                                r.body().user.email
+                        );
+
+                        session.savePhone(ph);
                         startActivity(new Intent(RegisterActivity.this, HomeActivity.class));
                     } else {
                         Ui.toast(RegisterActivity.this,

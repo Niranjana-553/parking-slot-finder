@@ -18,6 +18,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import android.content.Intent;
 
 public class MyBookingsActivity extends AppCompatActivity {
 
@@ -67,12 +68,13 @@ public class MyBookingsActivity extends AppCompatActivity {
                             "Could not load parking lots."
                     );
 
-                    // Still try to load bookings
-                    loadBookings(uid, new HashMap<>());
+
+                    loadBookings(uid, new HashMap<>(), new HashMap<>());
                     return;
                 }
 
                 Map<Integer, String> lotNames = new HashMap<>();
+                Map<Integer, String> slotNames = new HashMap<>();
 
                 for (ParkingLot lot : response.body()) {
 
@@ -88,7 +90,7 @@ public class MyBookingsActivity extends AppCompatActivity {
                     }
                 }
 
-                loadBookings(uid, lotNames);
+                loadAllSlots(uid, lotNames);
             }
 
             @Override
@@ -97,14 +99,67 @@ public class MyBookingsActivity extends AppCompatActivity {
                     Throwable t) {
 
                 // If parking lots fail, still show bookings
-                loadBookings(uid, new HashMap<>());
+                loadBookings(uid, new HashMap<>(), new HashMap<>());
             }
         });
     }
 
-    private void loadBookings(
+
+
+    private void loadAllSlots(
             String uid,
             Map<Integer, String> lotNames) {
+
+        ParkingApi api =
+                ApiClient.spring().create(ParkingApi.class);
+
+        api.getAllParkingSlots().enqueue(
+                new Callback<List<ParkingSlot>>() {
+
+                    @Override
+                    public void onResponse(
+                            Call<List<ParkingSlot>> call,
+                            Response<List<ParkingSlot>> response) {
+
+                        Map<Integer, String> slotNames =
+                                new HashMap<>();
+
+                        if (response.isSuccessful()
+                                && response.body() != null) {
+
+                            for (ParkingSlot slot : response.body()) {
+
+                                if (slot.id != null
+                                        && slot.slotNumber != null
+                                        && !slot.slotNumber.trim().isEmpty()) {
+
+                                    slotNames.put(
+                                            slot.id,
+                                            slot.slotNumber
+                                    );
+                                }
+                            }
+                        }
+
+                        loadBookings(uid, lotNames, slotNames);
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<List<ParkingSlot>> call,
+                            Throwable t) {
+
+                        // Bookings can still be displayed without slot names.
+                        loadBookings(uid, lotNames, new HashMap<>());
+                    }
+                });
+    }
+
+
+    private void loadBookings(
+            String uid,
+            Map<Integer, String> lotNames,
+            Map<Integer, String> slotNames) {
 
         ParkingApi api =
                 ApiClient.spring().create(ParkingApi.class);
@@ -118,6 +173,7 @@ public class MyBookingsActivity extends AppCompatActivity {
                             Response<List<Booking>> response) {
 
                         list.removeAllViews();
+                        android.util.Log.d("MY_BOOKINGS", "Bookings response received");
 
                         if (!response.isSuccessful()
                                 || response.body() == null) {
@@ -134,6 +190,10 @@ public class MyBookingsActivity extends AppCompatActivity {
                         }
 
                         List<Booking> bookings = response.body();
+                        android.util.Log.d(
+                                "MY_BOOKINGS",
+                                "Number of bookings: " + bookings.size()
+                        );
 
                         if (bookings.isEmpty()) {
 
@@ -185,30 +245,51 @@ public class MyBookingsActivity extends AppCompatActivity {
                             StringBuilder details =
                                     new StringBuilder();
 
-                            details.append("Booking: ")
-                                    .append(b.id);
 
                             details.append("\nParking lot: ")
                                     .append(parkingLotName);
 
+                            String slotNumber = "Unknown";
+
+                            if (b.slotId != null) {
+                                String foundSlot = slotNames.get(b.slotId);
+
+                                if (foundSlot != null && !foundSlot.trim().isEmpty()) {
+                                    slotNumber = foundSlot;
+                                }
+                            }
+
                             details.append("\nSlot: ")
-                                    .append(
-                                            b.slotId != null
-                                                    ? b.slotId
-                                                    : "Unknown"
-                                    );
+                                    .append(slotNumber);
 
                             details.append("\n")
                                     .append(formatBookingTime(b.startTime))
                                     .append(" → ")
                                     .append(formatBookingTime(b.endTime));
 
+                            boolean hasEnded = false;
+
+                            try {
+                                hasEnded = b.endTime != null
+                                        && OffsetDateTime.parse(b.endTime)
+                                        .isBefore(OffsetDateTime.now());
+                            } catch (Exception e) {
+                                // If the end time cannot be parsed,
+                                // keep the original booking status.
+                            }
+
+                            String displayStatus;
+
+                            if (hasEnded) {
+                                displayStatus = "Ended";
+                            } else {
+                                displayStatus = b.status != null
+                                        ? b.status
+                                        : "Unknown";
+                            }
+
                             details.append("\nStatus: ")
-                                    .append(
-                                            b.status != null
-                                                    ? b.status
-                                                    : "Unknown"
-                                    );
+                                    .append(displayStatus);
 
                             if (b.totalCost != null) {
 
@@ -223,10 +304,62 @@ public class MyBookingsActivity extends AppCompatActivity {
                                             15
                                     );
 
+                            t.setTextColor(android.graphics.Color.WHITE);
+
+                            row.setBackgroundColor(android.graphics.Color.rgb(25, 58, 90));
+                            row.setPadding(24, 20, 24, 20);
+
+                            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT
+                            );
+
+                            params.setMargins(0, 0, 0, 20);
+                            row.setLayoutParams(params);
+
                             row.addView(t);
 
+
+
+                            final String receiptParkingLot = parkingLotName;
+                            final String receiptSlotNumber = slotNumber;
+                            final String receiptStatus = displayStatus;
+
+                            Button receiptButton = Ui.button(
+                                    MyBookingsActivity.this,
+                                    "View Receipt"
+                            );
+
+                            receiptButton.setOnClickListener(v -> {
+                                Intent intent = new Intent(
+                                        MyBookingsActivity.this,
+                                        ReceiptActivity.class
+                                );
+
+                                intent.putExtra("bookingId", String.valueOf(b.id));
+                                intent.putExtra("parkingLot", receiptParkingLot);
+                                intent.putExtra("slotNumber", receiptSlotNumber);
+                                intent.putExtra("startTime", formatBookingTime(b.startTime));
+                                intent.putExtra("endTime", formatBookingTime(b.endTime));
+                                intent.putExtra("status", receiptStatus);
+
+                                intent.putExtra(
+                                        "totalCost",
+                                        b.totalCost != null
+                                                ? String.valueOf(b.totalCost)
+                                                : "Not available"
+                                );
+
+                                startActivity(intent);
+                            });
+
+                            row.addView(receiptButton);
+
+
+
                             // Show cancel button only for confirmed bookings
-                            if ("confirmed".equalsIgnoreCase(b.status)) {
+                            if (!hasEnded
+                                    && "confirmed".equalsIgnoreCase(b.status)) {
 
                                 Button cancel =
                                         Ui.button(

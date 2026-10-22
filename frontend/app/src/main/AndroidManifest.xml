@@ -28,5 +28,8 @@
         <activity android:name=".MyBookingsActivity" android:exported="false" />
         <activity android:name=".NotificationsActivity" android:exported="false" />
         <activity android:name=".ProfileActivity" android:exported="false" />
+        <activity
+            android:name=".ReceiptActivity"
+            android:exported="false" />
     </application>
 </manifest>

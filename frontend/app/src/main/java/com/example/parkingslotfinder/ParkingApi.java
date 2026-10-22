@@ -25,6 +25,9 @@ public interface ParkingApi {
     @GET("api/parking-slots/available/lot/{parkingLotId}")
     Call<List<ParkingSlot>> getAvailableSlots(@Path("parkingLotId") String parkingLotId);
 
+    @GET("api/parking-slots")
+    Call<List<ParkingSlot>> getAllParkingSlots();
+
     @POST("api/bookings")
     Call<Booking> createBooking(
             @Query("userId") String userId,
@@ -67,6 +70,13 @@ public interface ParkingApi {
     @POST("api/payments/verify")
     Call<Booking> verifyPayment(
             @Body VerifyPaymentRequest request
+    );
+
+    @GET("api/bookings/availability")
+    Call<AvailabilityResponse> checkAvailability(
+            @Query("parkingSlotId") int parkingSlotId,
+            @Query("startTime") String startTime,
+            @Query("endTime") String endTime
     );
 
 }

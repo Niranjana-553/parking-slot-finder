@@ -1,13 +1,120 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical" android:padding="28dp" android:background="#F5F7FA"
-    android:layout_width="match_parent" android:layout_height="match_parent">
-    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="Profile" android:textSize="28sp" android:textStyle="bold" android:textColor="#071A32"/>
-    <TextView android:id="@+id/emailText" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="18sp" android:paddingTop="30dp"/>
-    <TextView android:id="@+id/userIdText" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textSize="13sp" android:paddingTop="10dp"/>
-    <Button android:id="@+id/logoutButton" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="LOG OUT" android:layout_marginTop="30dp"/>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#071A32">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="My Profile"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="12dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Your account information"
+        android:textSize="14sp"
+        android:textColor="#D0D8E0"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="28dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:padding="20dp"
+        android:layout_marginBottom="24dp"
+        android:background="#193A5A">
+
+        <TextView
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:gravity="center"
+            android:text="P"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:textColor="#00FF88"
+            android:background="@drawable/profile_avatar_bg" />
+
+        <TextView
+            android:id="@+id/profileNameText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="ParkNow User"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="14dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:background="#193A5A">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="EMAIL ADDRESS"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#00FF88" />
+
+        <TextView
+            android:id="@+id/emailText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No email"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:paddingTop="6dp"
+            android:paddingBottom="18dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#34536E" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="PHONE NUMBER"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#00FF88"
+            android:paddingTop="18dp" />
+
+        <TextView
+            android:id="@+id/phoneText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Phone number unavailable"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:paddingTop="6dp" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/logoutButton"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:text="LOG OUT"
+        android:textStyle="bold"
+        android:textColor="#071A32"
+        android:backgroundTint="#00FF88"
+        android:layout_marginTop="28dp" />
+
 </LinearLayout>

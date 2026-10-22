@@ -1,5 +1,5 @@
 package com.example.parkingslotfinder;
-
+import java.util.Comparator;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.LinearLayout;
@@ -8,10 +8,12 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.List;
-
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import android.view.View;
 
 public class SlotActivity extends AppCompatActivity {
 
@@ -21,6 +23,7 @@ public class SlotActivity extends AppCompatActivity {
 
     private int lotId;
     private String parkingLotName;
+    private String parkingLotAddress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +37,7 @@ public class SlotActivity extends AppCompatActivity {
         rateParkingButton = findViewById(R.id.rateParkingButton);
 
         TextView title = findViewById(R.id.title);
+        TextView addressText = findViewById(R.id.addressText);
 
 
         parkingLotName =
@@ -55,6 +59,16 @@ public class SlotActivity extends AppCompatActivity {
         } else {
 
             title.setText("Parking Slots");
+        }
+
+        parkingLotAddress =
+                getIntent().getStringExtra("parkingLotAddress");
+
+        if (parkingLotAddress != null
+                && !parkingLotAddress.trim().isEmpty()) {
+            addressText.setText(parkingLotAddress);
+        } else {
+            addressText.setVisibility(View.GONE);
         }
 
         if (lotId == -1) {
@@ -108,10 +122,51 @@ public class SlotActivity extends AppCompatActivity {
                             return;
                         }
 
-                        List<ParkingSlot> slots =
-                                response.body();
+                        List<ParkingSlot> slots = response.body();
 
+// Sort slots in natural ascending order: A1, A2, A3 ... A10
+                        slots.sort((a, b) -> {
+                            String first = a.slotNumber;
+                            String second = b.slotNumber;
 
+                            if (first == null) first = "";
+                            if (second == null) second = "";
+
+                            java.util.regex.Matcher m1 =
+                                    java.util.regex.Pattern.compile("^(\\D*)(\\d+)$")
+                                            .matcher(first.trim());
+
+                            java.util.regex.Matcher m2 =
+                                    java.util.regex.Pattern.compile("^(\\D*)(\\d+)$")
+                                            .matcher(second.trim());
+
+                            boolean match1 = m1.matches();
+                            boolean match2 = m2.matches();
+
+                            if (match1 && match2) {
+                                int prefixCompare = m1.group(1).compareToIgnoreCase(m2.group(1));
+
+                                if (prefixCompare != 0) {
+                                    return prefixCompare;
+                                }
+
+                                int numberCompare = Integer.compare(
+                                        Integer.parseInt(m1.group(2)),
+                                        Integer.parseInt(m2.group(2))
+                                );
+
+                                if (numberCompare != 0) {
+                                    return numberCompare;
+                                }
+
+                                return first.compareToIgnoreCase(second);
+                            }
+
+                            if (match1) return -1;
+                            if (match2) return 1;
+
+                            return first.compareToIgnoreCase(second);
+                        });
 
                         if (slots.isEmpty()) {
 
@@ -177,85 +232,56 @@ public class SlotActivity extends AppCompatActivity {
                                 );
                             }
 
+                            LinearLayout slotCard = new LinearLayout(SlotActivity.this);
+                            slotCard.setOrientation(LinearLayout.VERTICAL);
+                            slotCard.setGravity(Gravity.CENTER_VERTICAL);
+                            slotCard.setPadding(dp(16), dp(14), dp(16), dp(14));
 
-                            TextView slotView =
-                                    Ui.text(
-                                            SlotActivity.this,
-                                            slotInfo.toString(),
-                                            17
-                                    );
+// Card background matching the homepage
+                            GradientDrawable cardBackground = new GradientDrawable();
+                            cardBackground.setColor(0xFF193A5A);
+                            cardBackground.setCornerRadius(dp(18));
+                            slotCard.setBackground(cardBackground);
 
-                            slotView.setTextColor(
-                                    0xFF000000
+// Slot information
+                            TextView slotView = Ui.text(
+                                    SlotActivity.this,
+                                    slotInfo.toString(),
+                                    17
                             );
+                            slotView.setTextColor(0xFFFFFFFF);
+                            slotCard.addView(slotView);
 
-                            slotView.setBackgroundColor(
-                                    0xFFFFFFFF
-                            );
+// Preserve click-to-book functionality
+                            slotCard.setOnClickListener(x -> {
+                                Intent intent = new Intent(
+                                        SlotActivity.this,
+                                        BookingActivity.class
+                                );
 
+                                intent.putExtra("slotId", slot.id);
+                                intent.putExtra("parkingLotId", lotId);
+                                intent.putExtra("parkingLotName", parkingLotName);
+                                intent.putExtra("slotNumber", slot.slotNumber);
 
-                            slotView.setOnClickListener(
-                                    x -> {
+                                if (slot.price != null) {
+                                    intent.putExtra("price", slot.price);
+                                }
 
-                                        Intent intent =
-                                                new Intent(
-                                                        SlotActivity.this,
-                                                        BookingActivity.class
-                                                );
+                                startActivity(intent);
+                            });
 
-
-                                        intent.putExtra(
-                                                "slotId",
-                                                slot.id
-                                        );
-
-
-                                        intent.putExtra(
-                                                "parkingLotId",
-                                                lotId
-                                        );
-
-
-                                        intent.putExtra(
-                                                "parkingLotName",
-                                                parkingLotName
-                                        );
-
-
-                                        intent.putExtra(
-                                                "slotNumber",
-                                                slot.slotNumber
-                                        );
-
-                                        if (slot.price != null) {
-
-                                            intent.putExtra(
-                                                    "price",
-                                                    slot.price
-                                            );
-                                        }
-
-                                        startActivity(intent);
-                                    }
-                            );
-
+// Spacing between cards
                             LinearLayout.LayoutParams params =
                                     new LinearLayout.LayoutParams(
                                             LinearLayout.LayoutParams.MATCH_PARENT,
                                             LinearLayout.LayoutParams.WRAP_CONTENT
                                     );
 
-                            params.setMargins(
-                                    0,
-                                    0,
-                                    0,
-                                    15
-                            );
+                            params.setMargins(0, 0, 0, dp(12));
 
-                            list.addView(
-                                    slotView,
-                                    params
-                            );
+                            list.addView(slotCard, params);
+
                         }
                     }
 
@@ -292,7 +318,7 @@ public class SlotActivity extends AppCompatActivity {
 
                             if (summary.ratingCount == 0) {
                                 ratingText.setText(
-                                        "⭐ No ratings yet"
+                                        "No ratings yet"
                                 );
                             } else {
                                 ratingText.setText(
@@ -407,5 +433,9 @@ public class SlotActivity extends AppCompatActivity {
                 "%.2f",
                 price
         );
+    }
+    private int dp(float value) {
+        return (int) (value * getResources()
+                .getDisplayMetrics().density + 0.5f);
     }
 }
